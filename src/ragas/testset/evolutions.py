@@ -5,6 +5,7 @@ import typing as t
 from abc import abstractmethod
 from dataclasses import dataclass, field
 
+import os
 import numpy as np
 from langchain_core.pydantic_v1 import BaseModel
 
@@ -555,7 +556,7 @@ class ReasoningEvolution(ComplexEvolution):
     async def _aevolve(
         self, current_tries: int, current_nodes: CurrentNodes
     ) -> EvolutionOutput:
-        current_nodes = self.docstore.get_max_context(current_nodes.nodes[0], 5000)
+        current_nodes = self.docstore.get_max_context(current_nodes.nodes[0], os.getenv("CHUNK_MAX_LENGTH"))
         result = await self._acomplex_evolution(
             current_tries, current_nodes, self.reasoning_question_prompt
         )
@@ -584,6 +585,7 @@ class ConditionalEvolution(ComplexEvolution):
     async def _aevolve(
         self, current_tries: int, current_nodes: CurrentNodes
     ) -> EvolutionOutput:
+        current_nodes = self.docstore.get_max_context(current_nodes.nodes[0], os.getenv("CHUNK_MAX_LENGTH"))
         result = await self._acomplex_evolution(
             current_tries, current_nodes, self.conditional_question_prompt
         )
@@ -617,6 +619,7 @@ class CounterfactualEvolution(ComplexEvolution):
         assert self.question_filter is not None, "question_filter cannot be None"
         assert self.se is not None, "simple evolution cannot be None"
 
+        current_nodes = self.docstore.get_max_context(current_nodes.nodes[0], os.getenv("CHUNK_MAX_LENGTH"))
         simple_question, current_nodes, _, ax, bx = await self.se._aevolve(
             current_tries, current_nodes
         )
@@ -661,7 +664,8 @@ class ErrorCorrectionEvolution(ComplexEvolution):
         assert self.generator_llm is not None, "generator_llm cannot be None"
         assert self.question_filter is not None, "question_filter cannot be None"
         assert self.se is not None, "simple evolution cannot be None"
-
+        
+        current_nodes = self.docstore.get_max_context(current_nodes.nodes[0], os.getenv("CHUNK_MAX_LENGTH"))
         simple_question, current_nodes, _, ax, bx = await self.se._aevolve(
             current_tries, current_nodes
         )
