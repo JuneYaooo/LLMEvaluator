@@ -71,5 +71,9 @@ import datetime
 
 # 获取当前时间
 current_time = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+# 检查output文件夹是否存在
+if not os.path.exists('output'):
+    # 如果不存在，创建output文件夹
+    os.makedirs('output')
 test_res_df.to_csv(f"output/test_data_{current_time}.csv", index=False, encoding='utf-8')
 print('end')
