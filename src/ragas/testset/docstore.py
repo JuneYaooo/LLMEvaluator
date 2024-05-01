@@ -549,14 +549,14 @@ class OutMemoryDocumentStore(DocumentStore):
 
         # Traverse backwards
         prev_node = node.prev
-        while prev_node and current_length + len(prev_node.page_content) <= max_chars:
+        while prev_node and current_length + len(prev_node.page_content) <= int(max_chars):
             nodes.insert(0, prev_node)  # Insert at the beginning of the list
             current_length += len(prev_node.page_content)
             prev_node = prev_node.prev
 
         # Traverse forwards
         next_node = node.next
-        while next_node and current_length + len(next_node.page_content) <= max_chars:
+        while next_node and current_length + len(next_node.page_content) <= int(max_chars):
             nodes.append(next_node)  # Append to the end of the list
             current_length += len(next_node.page_content)
             next_node = next_node.next

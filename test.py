@@ -5,10 +5,10 @@ from langchain_core.documents import Document
 from src.ragas.testset.generator import TestsetGenerator
 from src.ragas.testset.evolutions import simple, reasoning, multi_context, counterfactual, error_correction
 
+print('os.getenv("LLM_API_BASE")',os.getenv("LLM_API_BASE"))
+os.environ['OPENAI_API_BASE'] = os.getenv("LLM_API_BASE")
+os.environ["OPENAI_API_KEY"] = os.getenv("LLM_API_KEY")
 
-
-os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
-os.environ['OPENAI_API_BASE'] = os.getenv("OPENAI_API_BASE")
 OCR_API_URL = os.getenv("OCR_API_URL")
 
 def get_file_info(file_path):
@@ -37,7 +37,7 @@ def get_file_info(file_path):
     return file_info
 
 # 要遍历的文件夹路径
-folder_path = '/home/ubuntu/github/ragas/data'
+folder_path = '/home/ubuntu/github/LLMEvaluator/data'
 
 # 存储所有文档的列表
 documents = []
@@ -58,7 +58,7 @@ distributions = {reasoning: 1} #{simple: 0.5, reasoning: 0.25, multi_context: 0.
 generator = TestsetGenerator.with_openai(chunk_size=512)
 testset = generator.generate_with_langchain_docs(
     documents[:50],
-    test_size=2,
+    test_size=5,
     raise_exceptions=False,
     with_debugging_logs=False,
     distributions=distributions,
@@ -71,5 +71,5 @@ import datetime
 
 # 获取当前时间
 current_time = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-test_res_df.to_csv(f"data_{current_time}.csv", index=False, encoding='utf-8')
+test_res_df.to_csv(f"output/test_data_{current_time}.csv", index=False, encoding='utf-8')
 print('end')
