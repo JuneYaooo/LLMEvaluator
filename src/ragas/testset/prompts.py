@@ -525,3 +525,33 @@ evolution_elimination_prompt = Prompt(
     output_type="json",
     language="english",
 )
+
+k_context_question_prompt = Prompt(
+    name="k_context_question",
+    instruction="""
+    The task is to rewrite and complicate the given question in a way that answering it requires information derived from context1 but not from context2. 
+    Follow the rules given below while rewriting the question.
+        1. The rewritten question should not be very long. Use abbreviation wherever possible.
+        2. The rewritten question must be reasonable and must be understood and responded by humans.
+        3. The rewritten question must be fully answerable from information present in context1 and can't be derived from context2. 
+        4. Read and understand both contexts and rewrite the question so that answering requires insight from context1 but not from context2.
+        5. phrases like 'based on the provided context','according to the context?',etc are not allowed to appear in the question.""",
+    examples=[
+        {
+            "question": "What makes plants green and grow?",
+            "context1": "The pigment in green leaves is chlorophyll, which is one of the key factors for photosynthesis.",
+            "context2": "The roots of plants can absorb water and nutrients from the soil.",
+            "output": "What pigment in plant leaves is one of the key factors for photosynthesis?",
+        },
+        {
+            "question": "Can you introduce some relevant knowledge about the sun or the moon?",
+            "context1": "The moon is the only satellite of the earth, with a diameter of about 3474 kilometers.",
+            "context2": "The sun is the star at the center of the solar system, with a mass about 330,000 times that of the earth.",
+            "output": "How many kilometers is the diameter of the moon?",
+        },
+    ],
+    input_keys=["question", "context1", "context2"],
+    output_key="output",
+    output_type="str",
+    language="english",
+)

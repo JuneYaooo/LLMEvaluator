@@ -6,8 +6,14 @@ from ragas.run_config import RunConfig
 
 from src.ragas.common.read_files import process_markdown, extract_pdf, read_docx, process_docx, process_and_deduplicate, read_txt
 from src.ragas.testset.generator import TestsetGenerator
-from src.ragas.testset.evolutions import simple, reasoning, multi_context, counterfactual, error_correction
-
+from src.ragas.testset.evolutions import (
+    simple, 
+    reasoning, 
+    multi_context, 
+    counterfactual, 
+    error_correction,
+    KContextEvolution
+)
 
 env_state = os.getenv('ENV_STATE', 'example')
 dotenv.load_dotenv(f'.env.{env_state}', override=True)
@@ -18,7 +24,7 @@ def get_file_info(file_path):
     file_info = []
 
     if file_extension == 'pdf':
-        file_info = extract_pdf(file_path, upload_url=OCR_API_URL)
+        file_info = extract_pdf(file_path, upload_url=os.getenv('OCR_API_URL'))
         if not file_info:
             raise ValueError(f"Failed to read file {file_path}")
         result_list = process_markdown(file_info["file_content"], file_info["file_name"])
@@ -51,7 +57,8 @@ def load_documents():
 
 
 documents = load_documents()
-distributions = {reasoning: 1} #{simple: 0.5, reasoning: 0.25, multi_context: 0.25, counterfactual:0.7,error_correction}
+k_context = KContextEvolution(context_num=2)
+distributions = {k_context: 1} #{simple: 0.5, reasoning: 0.25, multi_context: 0.25, counterfactual:0.7,error_correction}
 
 generator_llm = ChatOpenAI(model="gpt-3.5-turbo-16k")
 critic_llm = ChatOpenAI(model="gpt-3.5-turbo-16k")

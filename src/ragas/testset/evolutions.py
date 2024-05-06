@@ -26,7 +26,8 @@ from src.ragas.testset.prompts import (
     reasoning_question_prompt,
     seed_question_prompt,
     counterfactual_prompt,
-    error_correction_prompt
+    error_correction_prompt,
+    k_context_question_prompt
 )
 from src.ragas.testset.utils import rng
 
@@ -703,6 +704,7 @@ class KContextEvolution(ComplexEvolution):
     k_context_question_prompt: Prompt = field(
         default_factory=lambda: k_context_question_prompt
     )
+    context_num: int = 1
 
     async def _aevolve(
         self, current_tries: int, current_nodes: CurrentNodes
@@ -716,31 +718,29 @@ class KContextEvolution(ComplexEvolution):
             current_tries, current_nodes
         )
         logger.debug(
-            "[MultiContextEvolution] simple question generated: %s", simple_question
+            "[KContextEvolution] simple question generated: %s", simple_question
         )
         # find a similar node and generate a question based on both
         merged_node = self.merge_nodes(current_nodes)
-        similar_node = self.docstore.get_similar(merged_node, top_k=1)
-        if not similar_node:
-            # retry
-            new_random_nodes = self.docstore.get_random_nodes(k=1)
-            current_nodes = CurrentNodes(
-                root_node=new_random_nodes[0], nodes=new_random_nodes
-            )
-            return await self.aretry_evolve(current_tries, current_nodes)
-        else:
-            assert isinstance(similar_node[0], Node), "similar_node must be a Node"
-            current_nodes.nodes.append(similar_node[0])
+
+        random_nodes = []
+        while len(random_nodes) != self.context_num:
+            n = self.context_num - len(random_nodes)
+            random_nodes = self.docstore.get_random_nodes(n)
+            for node in random_nodes:
+                if node not in random_nodes and node.filename != current_nodes.nodes[0].filename:
+                    random_nodes.append(node)
+                    current_nodes.nodes.append(node)
 
         prompt = self.k_context_question_prompt.format(
             question=simple_question,
             context1=merged_node.page_content,
-            context2=similar_node[0].page_content,
+            context2=''.join([n.page_content for n in random_nodes]),
         )
         results = await self.generator_llm.generate(prompt=prompt)
         question = results.generations[0][0].text.strip()
         logger.debug(
-            "[MultiContextEvolution] multicontext question generated: %s", question
+            "[KContextEvolution] k_context question generated: %s", question
         )
         is_valid_question, feedback = await self.question_filter.filter(question)
         if not is_valid_question:
@@ -762,7 +762,7 @@ class KContextEvolution(ComplexEvolution):
             prompt=self.compress_question_prompt, question=question
         )
         logger.debug(
-            "[MultiContextEvolution] multicontext question compressed: %s",
+            "[KContextEvolution] k_context question compressed: %s",
             compressed_question,
         )
 
@@ -772,7 +772,20 @@ class KContextEvolution(ComplexEvolution):
             current_nodes = self.se._get_new_random_node()
             return await self.aretry_evolve(current_tries, current_nodes)
 
-        return compressed_question, current_nodes, "multi_context","",[]
+        return compressed_question, current_nodes, "k_context","",[]
+
+    def __hash__(self):
+        return hash(self.__class__.__name__)
+
+    def adapt(self, language: str, cache_dir: t.Optional[str] = None) -> None:
+        super().adapt(language, cache_dir)
+        self.error_correction_prompt = self.error_correction_prompt.adapt(
+            language, self.generator_llm, cache_dir
+        )
+
+    def save(self, cache_dir: t.Optional[str] = None) -> None:
+        super().save(cache_dir)
+        self.error_correction_prompt.save(cache_dir)
 
 simple = SimpleEvolution()
 multi_context = MultiContextEvolution()
