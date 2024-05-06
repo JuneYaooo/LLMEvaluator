@@ -464,6 +464,7 @@ class MultiContextEvolution(ComplexEvolution):
     multi_context_question_prompt: Prompt = field(
         default_factory=lambda: multi_context_question_prompt
     )
+    context_num: int = 1
 
     async def _aevolve(
         self, current_tries: int, current_nodes: CurrentNodes
@@ -481,23 +482,27 @@ class MultiContextEvolution(ComplexEvolution):
         )
         # find a similar node and generate a question based on both
         merged_node = self.merge_nodes(current_nodes)
-        similar_node = self.docstore.get_similar(merged_node, top_k=1)
-        if not similar_node:
+        similar_nodes = self.docstore.get_similar(merged_node, top_k=self.context_num)
+
+        if not similar_nodes:
             # retry
-            new_random_nodes = self.docstore.get_random_nodes(k=1)
+            new_random_nodes = self.docstore.get_random_nodes(k=self.context_num)
             current_nodes = CurrentNodes(
                 root_node=new_random_nodes[0], nodes=new_random_nodes
             )
             return await self.aretry_evolve(current_tries, current_nodes)
         else:
-            assert isinstance(similar_node[0], Node), "similar_node must be a Node"
-            current_nodes.nodes.append(similar_node[0])
+            assert isinstance(similar_nodes[0], Node), "similar_node must be a Node"
+            for node in similar_nodes:
+                current_nodes.nodes.append(node)
 
-        prompt = self.multi_context_question_prompt.format(
-            question=simple_question,
-            context1=merged_node.page_content,
-            context2=similar_node[0].page_content,
-        )
+        params = {
+            'question': simple_question,
+            'context1': merged_node.page_content
+        }
+        for i, node in enumerate(similar_nodes): params[f'context{i+2}'] = node.page_content
+        self.multi_context_question_prompt.input_keys = list(params.keys())
+        prompt = self.multi_context_question_prompt.format(**params)
         results = await self.generator_llm.generate(prompt=prompt)
         question = results.generations[0][0].text.strip()
         logger.debug(

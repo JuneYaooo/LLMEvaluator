@@ -102,12 +102,12 @@ negative_rejection_prompt = Prompt(
 multi_context_question_prompt = Prompt(
     name="multi_context_question",
     instruction="""
-    The task is to rewrite and complicate the given question in a way that answering it requires information derived from both context1 and context2. 
+    The task is to rewrite and complicate the given question in a way that answering it requires information derived from context1, context2 and context3 and so on.
     Follow the rules given below while rewriting the question.
         1. The rewritten question should not be very long. Use abbreviation wherever possible.
         2. The rewritten question must be reasonable and must be understood and responded by humans.
-        3. The rewritten question must be fully answerable from information present in context1 and context2. 
-        4. Read and understand both contexts and rewrite the question so that answering requires insight from both context1 and context2.
+        3. The rewritten question must be fully answerable from information present in context1, context2 and so on. 
+        4. Read and understand both contexts and rewrite the question so that answering requires insight from multiple contexts.
         5. phrases like 'based on the provided context','according to the context?',etc are not allowed to appear in the question.""",
     examples=[
         {
@@ -117,10 +117,11 @@ multi_context_question_prompt = Prompt(
             "output": "In which plant structures does the pigment responsible for their verdancy facilitate energy production?",
         },
         {
-            "question": "How do you calculate the area of a rectangle?",
-            "context1": "The area of a shape is calculated based on the shape's dimensions. For rectangles, this involves multiplying the length and width.",
-            "context2": "Rectangles have four sides with opposite sides being equal in length. They are a type of quadrilateral.",
-            "output": "What multiplication involving equal opposites yields a quadrilateral's area?",
+            "question": "When were domestic cats domesticated?",
+            "context1": "Domestic cats are descendants of African wildcats, and their domestication likely began around 9,000 years ago.",
+            "context2": "African wildcats are known for their agility and ability to land on their feet due to their flexible spines and inner ear mechanisms.",
+            "context3": "Felines are obligate carnivores, meaning their diet primarily consists of meat.",
+            "output": "What evolutionary adaptations enable domestic cats to exhibit both nimbleness and stability, given their dietary preferences and ancestral origins?",
         },
     ],
     input_keys=["question", "context1", "context2"],

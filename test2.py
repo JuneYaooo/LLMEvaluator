@@ -7,11 +7,11 @@ from ragas.run_config import RunConfig
 from src.ragas.common.read_files import process_markdown, extract_pdf, read_docx, process_docx, process_and_deduplicate, read_txt
 from src.ragas.testset.generator import TestsetGenerator
 from src.ragas.testset.evolutions import (
-    simple, 
-    reasoning, 
-    multi_context, 
-    counterfactual, 
+    simple,
+    reasoning,
+    counterfactual,
     error_correction,
+    MultiContextEvolution,
     KContextEvolution
 )
 
@@ -58,7 +58,8 @@ def load_documents():
 
 documents = load_documents()
 k_context = KContextEvolution(context_num=2)
-distributions = {k_context: 1} #{simple: 0.5, reasoning: 0.25, multi_context: 0.25, counterfactual:0.7,error_correction}
+multi_context = MultiContextEvolution(context_num=2)
+distributions = {multi_context: 1} #{simple: 0.5, reasoning: 0.25, multi_context: 0.25, counterfactual:0.7,error_correction}
 
 generator_llm = ChatOpenAI(model="gpt-3.5-turbo-16k")
 critic_llm = ChatOpenAI(model="gpt-3.5-turbo-16k")
@@ -66,7 +67,8 @@ embeddings = OpenAIEmbeddings()
 generator = TestsetGenerator.from_langchain(
     generator_llm,
     critic_llm,
-    embeddings
+    embeddings,
+    chunk_size=int(os.getenv('CHUNK_MAX_LENGTH'))
 )
 testset = generator.generate_with_langchain_docs(
     documents,
