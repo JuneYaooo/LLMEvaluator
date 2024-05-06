@@ -75,6 +75,30 @@ counterfactual_prompt = Prompt(
     language="english",
 )
 
+negative_rejection_prompt = Prompt(
+    name="negative_rejection_prompt",
+    instruction="""Create a question that is completely unrelated to the initial one, while still ensuring it can be understood, even if it includes intentional handwriting errors such as typos or slightly distorted words. Please adhere to these guidelines:
+1. Avoid using phrases like 'given the previous information,' 'in light of the details shared,' or similar context-dependent clauses in your new question.""",
+    examples=[
+        {
+        "question": " Discuss the impact of climate change on global agriculture.",
+        "output": "Explain the evolution of jazz music in the early 20th century."
+    },
+    {
+        "question": "Analyze the role of blockchain technology in securing financial transactions.",
+        "output": "Describe the process of how vaccines are developed and tested for effectiveness."
+    },
+    {
+        "question": "阐述电子商务对实体零售业的影响。",
+        "output": "解析《红楼梦》中主要人物性格的形成原因。"
+    }
+    ],
+    input_keys=["question"],
+    output_key="output",
+    output_type="str",
+    language="english",
+)
+
 multi_context_question_prompt = Prompt(
     name="multi_context_question",
     instruction="""

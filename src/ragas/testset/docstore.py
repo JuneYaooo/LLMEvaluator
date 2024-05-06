@@ -526,7 +526,24 @@ class OutMemoryDocumentStore(DocumentStore):
         scores, doc_ids = scores[1:], doc_ids[1:]
         items = [self.nodes[doc_id] for doc_id in doc_ids]
         return items
-
+    async def search_doc(
+            self, query_text, threshold: float = 0.7, top_k: int = 3
+        ) -> t.Union[t.List[Document], t.List[Node]]:
+            if self.embeddings is None:
+                raise ValueError("no embeddings.")
+            embedded_query = await self.embeddings.embed_text(query_text)
+            scores, doc_ids = get_top_k_embeddings(
+                query_embedding=embedded_query,
+                embeddings=self.node_embeddings_list,
+                similarity_fn=similarity,
+                similarity_cutoff=threshold,
+                # we need to return k+1 docs here as the top result is the input doc itself
+                similarity_top_k=top_k + 1,
+            )
+            # remove the query doc itself from results
+            scores, doc_ids = scores[1:], doc_ids[1:]
+            items = [self.nodes[doc_id] for doc_id in doc_ids]
+            return items
     def set_run_config(self, run_config: RunConfig):
         if self.embeddings:
             self.embeddings.set_run_config(run_config)

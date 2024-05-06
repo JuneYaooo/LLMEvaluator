@@ -27,7 +27,8 @@ from src.ragas.testset.prompts import (
     seed_question_prompt,
     counterfactual_prompt,
     error_correction_prompt,
-    k_context_question_prompt
+    k_context_question_prompt,
+    negative_rejection_prompt
 )
 from src.ragas.testset.utils import rng
 
@@ -198,12 +199,12 @@ class Evolution:
     ):
         assert self.generator_llm is not None, "generator_llm cannot be None"
 
-        node_content = [
-            f"{i+1}\t{n.page_content}" for i, n in enumerate(current_nodes.nodes)
+        node_content_raw = [
+            f"{i+1}\t{n.page_content}" for i, n in enumerate(current_nodes_raw.nodes)
         ]
         results = await self.generator_llm.generate(
             prompt=self.find_relevant_context_prompt.format(
-                question=question, contexts=node_content
+                question=question_raw, contexts=node_content_raw
             )
         )
         relevant_contexts_result = await json_loader.safe_load(
@@ -216,24 +217,24 @@ class Evolution:
         )
         if relevant_context_indices is None:
             relevant_context = CurrentNodes(
-                root_node=current_nodes.root_node, nodes=current_nodes.nodes
+                root_node=current_nodes_raw.root_node, nodes=current_nodes_raw.nodes
             )
         else:
             selected_nodes = [
-                current_nodes.nodes[i - 1]
+                current_nodes_raw.nodes[i - 1]
                 for i in relevant_context_indices
-                if i - 1 < len(current_nodes.nodes)
+                if i - 1 < len(current_nodes_raw.nodes)
             ]
             relevant_context = (
                 CurrentNodes(root_node=selected_nodes[0], nodes=selected_nodes)
                 if selected_nodes
-                else current_nodes
+                else current_nodes_raw
             )
 
         merged_nodes = self.merge_nodes(relevant_context)
         results = await self.generator_llm.generate(
             prompt=self.question_answer_prompt.format(
-                question=question, context=merged_nodes.page_content
+                question=question_raw, context=merged_nodes.page_content
             )
         )
         answer = await json_loader.safe_load(
@@ -248,8 +249,8 @@ class Evolution:
         return DataRow(
             question=question.strip('"'),
             question_raw=question_raw.strip('"'),
-            contexts=[n.page_content for n in relevant_context.nodes],
-            contexts_raw = current_nodes_raw,
+            contexts=[n.page_content for n in current_nodes.nodes],
+            contexts_raw = [n.page_content for n in relevant_context.nodes],
             ground_truth=answer,
             evolution_type=evolution_type,
             metadata=[n.metadata for n in relevant_context.nodes],
@@ -332,7 +333,7 @@ class SimpleEvolution(Evolution):
                 current_nodes = self._get_new_random_node()
                 return await self.aretry_evolve(current_tries, current_nodes)
 
-        return seed_question, current_nodes, "simple", "", []
+        return seed_question, current_nodes, "simple", seed_question, current_nodes
 
     def __hash__(self):
         return hash(self.__class__.__name__)
@@ -435,7 +436,7 @@ class ComplexEvolution(Evolution):
             )
             return await self.aretry_evolve(current_tries, current_nodes)
 
-        return compressed_question, current_nodes, simple_question, ""
+        return compressed_question, current_nodes, simple_question, current_nodes
 
     def adapt(self, language: str, cache_dir: t.Optional[str] = None) -> None:
         assert self.evolution_filter is not None, "evolution filter cannot be None"
@@ -532,7 +533,7 @@ class MultiContextEvolution(ComplexEvolution):
             current_nodes = self.se._get_new_random_node()
             return await self.aretry_evolve(current_tries, current_nodes)
 
-        return compressed_question, current_nodes, "multi_context","",[]
+        return compressed_question, current_nodes, "multi_context",simple_question,current_nodes
 
     def __hash__(self):
         return hash(self.__class__.__name__)
@@ -561,7 +562,7 @@ class ReasoningEvolution(ComplexEvolution):
         result = await self._acomplex_evolution(
             current_tries, current_nodes, self.reasoning_question_prompt
         )
-        return result[0], result[1], "reasoning", result[2], []
+        return result[0], result[1], "reasoning", result[2], result[3]
 
     def __hash__(self):
         return hash(self.__class__.__name__)
@@ -577,6 +578,7 @@ class ReasoningEvolution(ComplexEvolution):
         self.reasoning_question_prompt.save(cache_dir)
 
 
+# 目前没用这个
 @dataclass
 class ConditionalEvolution(ComplexEvolution):
     conditional_question_prompt: Prompt = field(
@@ -637,8 +639,9 @@ class CounterfactualEvolution(ComplexEvolution):
             prompt=prompt
         )
         counterfactual_content = result.generations[0][0].text.strip()
+        counterfactual_nodes = CurrentNodes(root_node=current_nodes.nodes[0], nodes=[counterfactual_content])
 
-        return simple_question, current_nodes, "counter_factual", "", [counterfactual_content]
+        return simple_question, counterfactual_nodes, "counter_factual", simple_question, current_nodes
         
     def __hash__(self):
         return hash(self.__class__.__name__)
@@ -684,7 +687,7 @@ class ErrorCorrectionEvolution(ComplexEvolution):
         )
         error_question = result.generations[0][0].text.strip()
 
-        return error_question, current_nodes,"error_correction", simple_question, []
+        return error_question, current_nodes,"error_correction", simple_question, current_nodes
 
     def __hash__(self):
         return hash(self.__class__.__name__)
@@ -772,7 +775,7 @@ class KContextEvolution(ComplexEvolution):
             current_nodes = self.se._get_new_random_node()
             return await self.aretry_evolve(current_tries, current_nodes)
 
-        return compressed_question, current_nodes, "k_context","",[]
+        return compressed_question, current_nodes, "k_context",simple_question,current_nodes
 
     def __hash__(self):
         return hash(self.__class__.__name__)
@@ -787,6 +790,93 @@ class KContextEvolution(ComplexEvolution):
         super().save(cache_dir)
         self.error_correction_prompt.save(cache_dir)
 
+
+@dataclass
+class NoReferenceEvolution(ComplexEvolution):
+    reasoning_question_prompt: Prompt = field(
+        default_factory=lambda: reasoning_question_prompt
+    )
+
+    async def _aevolve(
+        self, current_tries: int, current_nodes: CurrentNodes
+    ) -> EvolutionOutput:
+        assert self.generator_llm is not None, "generator_llm cannot be None"
+        assert self.question_filter is not None, "question_filter cannot be None"
+        assert self.se is not None, "simple evolution cannot be None"
+
+        current_nodes = self.docstore.get_max_context(current_nodes.nodes[0], os.getenv("CHUNK_MAX_LENGTH"))
+        simple_question, current_nodes, _, ax, bx = await self.se._aevolve(
+            current_tries, current_nodes
+        )
+        logger.debug(
+            "[%s] simple question generated: %s",
+            self.__class__.__name__,
+            simple_question,
+        )
+
+        return simple_question, CurrentNodes(root_node=[], nodes=[]), "no_reference", simple_question, current_nodes
+        
+    def __hash__(self):
+        return hash(self.__class__.__name__)
+
+    def adapt(self, language: str, cache_dir: t.Optional[str] = None) -> None:
+        super().adapt(language, cache_dir)
+        self.reasoning_question_prompt = self.reasoning_question_prompt.adapt(
+            language, self.generator_llm, cache_dir
+        )
+
+    def save(self, cache_dir: t.Optional[str] = None) -> None:
+        super().save(cache_dir)
+        self.reasoning_question_prompt.save(cache_dir)
+
+@dataclass
+class NegativeRejectionEvolution(ComplexEvolution):
+    negative_rejection_prompt: Prompt = field(
+        default_factory=lambda: negative_rejection_prompt
+    )
+
+    async def _aevolve(
+        self, current_tries: int, current_nodes: CurrentNodes
+    ) -> EvolutionOutput:
+        assert self.generator_llm is not None, "generator_llm cannot be None"
+        assert self.question_filter is not None, "question_filter cannot be None"
+        assert self.se is not None, "simple evolution cannot be None"
+        
+        current_nodes = self.docstore.get_max_context(current_nodes.nodes[0], os.getenv("CHUNK_MAX_LENGTH"))
+        simple_question, current_nodes, _, ax, bx = await self.se._aevolve(
+            current_tries, current_nodes
+        )
+        logger.debug(
+            "[%s] simple question generated: %s",
+            self.__class__.__name__,
+            simple_question,
+        )
+
+        # 不想关的问题
+        result = await self.generator_llm.generate(
+            prompt=negative_rejection_prompt.format(
+                question=simple_question,
+            )
+        )
+        negative_rejection_question = result.generations[0][0].text.strip()
+        search_node = self.docstore.search_doc(negative_rejection_question, top_k=5)
+
+        return simple_question, search_node, "negative_rejection", simple_question, current_nodes
+
+    def __hash__(self):
+        return hash(self.__class__.__name__)
+
+    def adapt(self, language: str, cache_dir: t.Optional[str] = None) -> None:
+        super().adapt(language, cache_dir)
+        self.error_correction_prompt = self.error_correction_prompt.adapt(
+            language, self.generator_llm, cache_dir
+        )
+
+    def save(self, cache_dir: t.Optional[str] = None) -> None:
+        super().save(cache_dir)
+        self.error_correction_prompt.save(cache_dir)
+
+
 simple = SimpleEvolution()
 multi_context = MultiContextEvolution()
 reasoning = ReasoningEvolution()
@@ -794,3 +884,5 @@ conditional = ConditionalEvolution()
 counterfactual = CounterfactualEvolution()
 error_correction = ErrorCorrectionEvolution()
 k_context = KContextEvolution()
+no_reference = NoReferenceEvolution()
+negative_rejection = NegativeRejectionEvolution()

@@ -53,7 +53,7 @@ for root, dirs, files in os.walk(folder_path):
 
 
 # 这里选择要生成什么类型的，以及比例
-distributions = {reasoning: 1} #{simple: 0.5, reasoning: 0.25, multi_context: 0.25, counterfactual:0.7,error_correction}
+distributions = {counterfactual: 1} #{simple: 0.5, reasoning: 0.25, multi_context: 0.25, counterfactual:0.7,error_correction, no_reference, negative_rejection}
 
 generator = TestsetGenerator.with_openai(chunk_size=512)
 testset = generator.generate_with_langchain_docs(
