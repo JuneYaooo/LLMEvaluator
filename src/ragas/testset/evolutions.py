@@ -698,6 +698,81 @@ class ErrorCorrectionEvolution(ComplexEvolution):
         super().save(cache_dir)
         self.error_correction_prompt.save(cache_dir)
 
+@dataclass
+class KContextEvolution(ComplexEvolution):
+    k_context_question_prompt: Prompt = field(
+        default_factory=lambda: k_context_question_prompt
+    )
+
+    async def _aevolve(
+        self, current_tries: int, current_nodes: CurrentNodes
+    ) -> EvolutionOutput:
+        assert self.docstore is not None, "docstore cannot be None"
+        assert self.generator_llm is not None, "generator_llm cannot be None"
+        assert self.question_filter is not None, "question_filter cannot be None"
+        assert self.se is not None, "simple evolution cannot be None"
+
+        simple_question, current_nodes, _, ax, bx = await self.se._aevolve(
+            current_tries, current_nodes
+        )
+        logger.debug(
+            "[MultiContextEvolution] simple question generated: %s", simple_question
+        )
+        # find a similar node and generate a question based on both
+        merged_node = self.merge_nodes(current_nodes)
+        similar_node = self.docstore.get_similar(merged_node, top_k=1)
+        if not similar_node:
+            # retry
+            new_random_nodes = self.docstore.get_random_nodes(k=1)
+            current_nodes = CurrentNodes(
+                root_node=new_random_nodes[0], nodes=new_random_nodes
+            )
+            return await self.aretry_evolve(current_tries, current_nodes)
+        else:
+            assert isinstance(similar_node[0], Node), "similar_node must be a Node"
+            current_nodes.nodes.append(similar_node[0])
+
+        prompt = self.k_context_question_prompt.format(
+            question=simple_question,
+            context1=merged_node.page_content,
+            context2=similar_node[0].page_content,
+        )
+        results = await self.generator_llm.generate(prompt=prompt)
+        question = results.generations[0][0].text.strip()
+        logger.debug(
+            "[MultiContextEvolution] multicontext question generated: %s", question
+        )
+        is_valid_question, feedback = await self.question_filter.filter(question)
+        if not is_valid_question:
+            # retry
+            # get more context to rewrite question
+            question, current_nodes = await self.fix_invalid_question(
+                question, current_nodes, feedback
+            )
+            logger.info("rewritten question: %s", question)
+            is_valid_question, _ = await self.question_filter.filter(question)
+
+            if not is_valid_question:
+                # retry with new nodes added
+                current_nodes = self.se._get_new_random_node()
+                return await self.aretry_evolve(current_tries, current_nodes)
+
+        # compress the question
+        compressed_question = await self._transform_question(
+            prompt=self.compress_question_prompt, question=question
+        )
+        logger.debug(
+            "[MultiContextEvolution] multicontext question compressed: %s",
+            compressed_question,
+        )
+
+        assert self.evolution_filter is not None, "evolution filter cannot be None"
+        if await self.evolution_filter.filter(simple_question, compressed_question):
+            # retry
+            current_nodes = self.se._get_new_random_node()
+            return await self.aretry_evolve(current_tries, current_nodes)
+
+        return compressed_question, current_nodes, "multi_context","",[]
 
 simple = SimpleEvolution()
 multi_context = MultiContextEvolution()
@@ -705,3 +780,4 @@ reasoning = ReasoningEvolution()
 conditional = ConditionalEvolution()
 counterfactual = CounterfactualEvolution()
 error_correction = ErrorCorrectionEvolution()
+k_context = KContextEvolution()
