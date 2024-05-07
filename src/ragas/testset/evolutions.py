@@ -738,13 +738,15 @@ class KContextEvolution(ComplexEvolution):
         merged_node = self.merge_nodes(current_nodes)
 
         random_nodes = []
+        nodes_filename = set([current_nodes.nodes[0].filename])
         while len(random_nodes) != self.context_num:
             n = self.context_num - len(random_nodes)
             random_nodes = self.docstore.get_random_nodes(n)
             for node in random_nodes:
-                if node not in random_nodes and node.filename != current_nodes.nodes[0].filename:
+                if node not in random_nodes and node.filename not in nodes_filename:
                     random_nodes.append(node)
                     current_nodes.nodes.append(node)
+                    nodes_filename.add(node.filename)
 
         prompt = self.k_context_question_prompt.format(
             question=simple_question,
