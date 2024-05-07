@@ -3,7 +3,7 @@ import os
 from langchain_core.documents import Document
 
 from src.ragas.testset.generator import TestsetGenerator
-from src.ragas.testset.evolutions import simple, reasoning, multi_context, counterfactual, error_correction
+from src.ragas.testset.evolutions import simple, reasoning, multi_context, counterfactual, error_correction, no_reference, negative_rejection, noise_robustness
 
 print('os.getenv("LLM_API_BASE")',os.getenv("LLM_API_BASE"))
 os.environ['OPENAI_API_BASE'] = os.getenv("LLM_API_BASE")
@@ -53,12 +53,12 @@ for root, dirs, files in os.walk(folder_path):
 
 
 # 这里选择要生成什么类型的，以及比例
-distributions = {counterfactual: 1} #{simple: 0.5, reasoning: 0.25, multi_context: 0.25, counterfactual:0.7,error_correction, no_reference, negative_rejection}
+distributions = {noise_robustness:1} #{simple: 0.5, reasoning: 0.25, multi_context: 0.25, counterfactual:0.7,error_correction:0.2, no_reference:0.2, negative_rejection:0.2, noise_robustness}
 
-generator = TestsetGenerator.with_openai(chunk_size=512)
+generator = TestsetGenerator.with_openai(chunk_size=2000)
 testset = generator.generate_with_langchain_docs(
     documents[:50],
-    test_size=5,
+    test_size=10,
     raise_exceptions=False,
     with_debugging_logs=False,
     distributions=distributions,

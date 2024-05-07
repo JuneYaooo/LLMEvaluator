@@ -8,6 +8,8 @@ from dataclasses import dataclass, field
 import os
 import numpy as np
 from langchain_core.pydantic_v1 import BaseModel
+import copy
+import random
 
 from src.ragas.exceptions import MaxRetriesExceeded
 from src.ragas.llms import BaseRagasLLM
@@ -644,7 +646,11 @@ class CounterfactualEvolution(ComplexEvolution):
             prompt=prompt
         )
         counterfactual_content = result.generations[0][0].text.strip()
-        counterfactual_nodes = CurrentNodes(root_node=current_nodes.nodes[0], nodes=[counterfactual_content])
+        counterfactual_nodes = CurrentNodes(root_node=current_nodes.nodes[0], nodes=[Node(
+            doc_id="counterfactual_nodes",
+            page_content=counterfactual_content,
+            keyphrases=[],
+        )])
 
         return simple_question, counterfactual_nodes, "counter_factual", simple_question, current_nodes
         
@@ -818,8 +824,7 @@ class NoReferenceEvolution(ComplexEvolution):
             self.__class__.__name__,
             simple_question,
         )
-
-        return simple_question, CurrentNodes(root_node=[], nodes=[]), "no_reference", simple_question, current_nodes
+        return simple_question, CurrentNodes(root_node=Node(doc_id="no_reference_nodes",page_content="",keyphrases=[]), nodes=[Node(doc_id="no_reference_nodes",page_content="",keyphrases=[])]), "no_reference", simple_question, current_nodes
         
     def __hash__(self):
         return hash(self.__class__.__name__)
@@ -847,7 +852,7 @@ class NegativeRejectionEvolution(ComplexEvolution):
         assert self.question_filter is not None, "question_filter cannot be None"
         assert self.se is not None, "simple evolution cannot be None"
         
-        current_nodes = self.docstore.get_max_context(current_nodes.nodes[0], os.getenv("CHUNK_MAX_LENGTH"))
+        # current_nodes = self.docstore.get_max_context(current_nodes.nodes[0], os.getenv("CHUNK_MAX_LENGTH"))
         simple_question, current_nodes, _, ax, bx = await self.se._aevolve(
             current_tries, current_nodes
         )
@@ -864,9 +869,66 @@ class NegativeRejectionEvolution(ComplexEvolution):
             )
         )
         negative_rejection_question = result.generations[0][0].text.strip()
-        search_node = self.docstore.search_doc(negative_rejection_question, top_k=5)
+        search_negative_list = await self.docstore.search_doc(negative_rejection_question, top_k=5)
+        if len(search_negative_list)>0:
+            search_nodes = CurrentNodes(root_node=search_negative_list[0], nodes=search_negative_list)
+        else:
+            search_nodes = CurrentNodes(root_node=Node(doc_id="negative_rejection_nodes",page_content="",keyphrases=[]), nodes=[Node(doc_id="negative_rejection_nodes",page_content="",keyphrases=[])])
 
-        return simple_question, search_node, "negative_rejection", simple_question, current_nodes
+        return simple_question, search_nodes, "negative_rejection", simple_question, current_nodes
+
+    def __hash__(self):
+        return hash(self.__class__.__name__)
+
+    def adapt(self, language: str, cache_dir: t.Optional[str] = None) -> None:
+        super().adapt(language, cache_dir)
+        self.error_correction_prompt = self.error_correction_prompt.adapt(
+            language, self.generator_llm, cache_dir
+        )
+
+    def save(self, cache_dir: t.Optional[str] = None) -> None:
+        super().save(cache_dir)
+        self.error_correction_prompt.save(cache_dir)
+
+
+@dataclass
+class NoiseRobustnessEvolution(ComplexEvolution):
+    negative_rejection_prompt: Prompt = field(
+        default_factory=lambda: negative_rejection_prompt
+    )
+
+    async def _aevolve(
+        self, current_tries: int, current_nodes: CurrentNodes
+    ) -> EvolutionOutput:
+        assert self.generator_llm is not None, "generator_llm cannot be None"
+        assert self.question_filter is not None, "question_filter cannot be None"
+        assert self.se is not None, "simple evolution cannot be None"
+        
+        # current_nodes = self.docstore.get_max_context(current_nodes.nodes[0], os.getenv("CHUNK_MAX_LENGTH"))
+        simple_question, current_nodes, _, ax, bx = await self.se._aevolve(
+            current_tries, current_nodes
+        )
+        logger.debug(
+            "[%s] simple question generated: %s",
+            self.__class__.__name__,
+            simple_question,
+        )
+
+        # 不想关的问题
+        result = await self.generator_llm.generate(
+            prompt=negative_rejection_prompt.format(
+                question=simple_question,
+            )
+        )
+        negative_rejection_question = result.generations[0][0].text.strip()
+        search_negative_list = await self.docstore.search_doc(negative_rejection_question, top_k=5)
+        search_nodes = copy.deepcopy(current_nodes)
+        for node in search_negative_list:
+            search_nodes.nodes.append(node)
+        # 打乱顺序
+        shuffle_search_nodes = CurrentNodes(root_node=search_nodes.root_node, nodes=random.sample(search_nodes.nodes, len(search_nodes.nodes)))
+
+        return simple_question, shuffle_search_nodes, "noise_robustness", simple_question, current_nodes
 
     def __hash__(self):
         return hash(self.__class__.__name__)
@@ -891,3 +953,4 @@ error_correction = ErrorCorrectionEvolution()
 k_context = KContextEvolution()
 no_reference = NoReferenceEvolution()
 negative_rejection = NegativeRejectionEvolution()
+noise_robustness = NoiseRobustnessEvolution()
