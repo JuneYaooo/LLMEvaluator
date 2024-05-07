@@ -1,7 +1,12 @@
 import os
+import re
+import tqdm
+import json
+import queue
 import dotenv
+import datasets
 import datetime
-from datasets import load_dataset
+import pandas as pd
 from langchain_core.documents import Document
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from ragas.run_config import RunConfig
@@ -10,6 +15,7 @@ from ragas.metrics import (
     answer_relevancy,
     faithfulness,
 )
+from ragas.testset.prompts import question_answer_prompt
 
 from src.ragas.common.read_files import process_markdown, extract_pdf, read_docx, process_docx, process_and_deduplicate, read_txt
 from src.ragas.testset.generator import TestsetGenerator
@@ -94,26 +100,92 @@ def generate_qa():
         os.makedirs('output')
     test_res_df.to_csv(f"output/test_data_{current_time}.csv", index=False, encoding='utf-8')
 
+def answer_qa(i=0):
+    import sys
+    sys.path.append('/mnt/workspace/maokangkun/Model_Eval/LLaMA-Factory')
+    from src.llmtuner import ChatModel
+
+    test_qa = pd.read_excel('data/llm_paper_eval_dataset.xlsx', sheet_name=1)
+    print(len(test_qa))
+
+    model_list = ['Meta-Llama-3-8B-Instruct']
+    model_name = model_list[i]
+    model_path = f'/mnt/workspace/maokangkun/Model_Eval/models/{model_name}'
+    device = f'cuda:{i}'
+    args = {
+        'model_name_or_path': model_path,
+        'template': 'default',
+        'flash_attn': 'fa2',
+        'max_new_tokens': 256,
+        'export_device': device,
+        # 'export_dir': '/tmp',
+    }
+    if 'pulse' in model_name: del args['flash_attn']
+    chat_model = ChatModel(args)
+
+    data = []
+    for _, d in tqdm.tqdm(list(test_qa.iterrows())):
+        contexts = [c for c in eval(d.contexts) if c]
+        context = '\n'.join([f'[context {i+1}]. {c}' for i, c in enumerate(contexts)])
+        if context:
+            context = '\n'+context
+        else:
+            context = 'None'
+
+        inp = question_answer_prompt.format(
+            question=d.question,
+            context=context
+        ).prompt_str
+
+        messages = [{"role": "user", "content": inp}]
+
+        retry = 0
+        while retry <= 5:
+            ret = chat_model.chat(messages)[0].response_text
+            m = re.findall(r'```{"answer": "(.*)", "verdict": ".*"}```', ret)
+            if m:
+                ans = m[0]
+                break
+            else:
+                ans = ret
+                retry += 1
+
+        data.append({
+            'id': d.order_number,
+            'question': d.question,
+            'answer': ans,
+            'contexts': contexts,
+            'ground_truth': d.ground_truth,
+            'metadata': eval(d.metadata),
+            'evolution_type': d.evolution_type,
+        })
+
+    out_file = f'data/answer_{model_name}.json'
+    with open(out_file, 'w', encoding='utf-8') as f:
+        json.dump(data, f, indent=4, ensure_ascii=False)
+
 def evaluate_qa():
-    amnesty_qa = load_dataset("/mnt/workspace/maokangkun/RAG_Eval/amnesty_qa", "english_v2", trust_remote_code=True)
+    eval_qa = datasets.load_dataset("json", data_files={'eval':"data/answer_Meta-Llama-3-8B-Instruct.json"})
+
     llm = ChatOpenAI(model="gpt-3.5-turbo-16k")
     embeddings = OpenAIEmbeddings()
 
     result = evaluate(
-        amnesty_qa["eval"],
+        eval_qa["eval"],
         metrics=[
             faithfulness,
             answer_relevancy
         ],
         llm=llm,
         embeddings=embeddings,
-        run_config=RunConfig(max_workers=1)
+        run_config=RunConfig(max_workers=4)
     )
     df = result.to_pandas()
     # print(df.head())
 
     current_time = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    df.to_csv(f"output/eval_{current_time}.csv", index=False, encoding='utf-8')
+    df.to_csv(f"data/eval_{current_time}.csv", index=False, encoding='utf-8')
 
 # generate_qa()
+# answer_qa()
 evaluate_qa()
