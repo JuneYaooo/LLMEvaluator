@@ -244,19 +244,32 @@ class Evolution:
         )
         answer = answer if isinstance(answer, dict) else {}
         logger.debug("answer generated: %s", answer)
-        answer = (
-            np.nan if answer.get("verdict") == "-1" else answer.get("answer", np.nan)
-        )
+        # answer = (
+        #     np.nan if answer.get("verdict") == "-1" else answer.get("answer", np.nan)
+        # )
 
-        return DataRow(
-            question=question.strip('"'),
-            question_raw=question_raw.strip('"'),
-            contexts=[n.page_content for n in current_nodes.nodes],
-            contexts_raw = [n.page_content for n in relevant_context.nodes],
-            ground_truth=answer,
-            evolution_type=evolution_type,
-            metadata=[n.metadata for n in relevant_context.nodes],
-        )
+        # return DataRow(
+        #     question=question.strip('"'),
+        #     question_raw=question_raw.strip('"'),
+        #     contexts=[n.page_content for n in current_nodes.nodes],
+        #     contexts_raw = [n.page_content for n in relevant_context.nodes],
+        #     ground_truth=answer,
+        #     evolution_type=evolution_type,
+        #     metadata=[n.metadata for n in relevant_context.nodes],
+        # )
+        # Check if verdict exists and equals 1, otherwise raise an error
+        if answer.get("verdict") == "1":
+            return DataRow(
+                question=question.strip('"'),
+                question_raw=question_raw.strip('"'),
+                contexts=[n.page_content for n in current_nodes.nodes],
+                contexts_raw=[n.page_content for n in relevant_context.nodes],
+                ground_truth=answer.get("answer", np.nan),
+                evolution_type=evolution_type,
+                metadata=[n.metadata for n in relevant_context.nodes],
+            )
+        else:
+            raise ValueError("Answer verdict is not 1 or does not exist")
 
     def adapt(self, language: str, cache_dir: t.Optional[str] = None) -> None:
         """
@@ -485,6 +498,7 @@ class MultiContextEvolution(ComplexEvolution):
         # find a similar node and generate a question based on both
         merged_node = self.merge_nodes(current_nodes)
         similar_nodes = self.docstore.get_similar(merged_node, top_k=self.context_num)
+        multi_nodes = copy.deepcopy(current_nodes)
 
         if not similar_nodes:
             # retry
@@ -496,7 +510,7 @@ class MultiContextEvolution(ComplexEvolution):
         else:
             assert isinstance(similar_nodes[0], Node), "similar_node must be a Node"
             for node in similar_nodes:
-                current_nodes.nodes.append(node)
+                multi_nodes.nodes.append(node)
 
         params = {
             'question': simple_question,
@@ -540,7 +554,7 @@ class MultiContextEvolution(ComplexEvolution):
             current_nodes = self.se._get_new_random_node()
             return await self.aretry_evolve(current_tries, current_nodes)
 
-        return compressed_question, current_nodes, "multi_context",simple_question,current_nodes
+        return compressed_question, multi_nodes, "multi_context",compressed_question,multi_nodes
 
     def __hash__(self):
         return hash(self.__class__.__name__)
@@ -739,6 +753,7 @@ class KContextEvolution(ComplexEvolution):
 
         random_nodes = []
         nodes_filename = set([current_nodes.nodes[0].filename])
+        k_content_nodes = copy.deepcopy(current_nodes)
         while len(random_nodes) != self.context_num:
             n = self.context_num - len(random_nodes)
             random_nodes = self.docstore.get_random_nodes(n)
@@ -746,6 +761,7 @@ class KContextEvolution(ComplexEvolution):
                 if node not in random_nodes and node.filename not in nodes_filename:
                     random_nodes.append(node)
                     nodes_filename.add(node.filename)
+                    k_content_nodes.nodes.append(node)
 
         prompt = self.k_context_question_prompt.format(
             question=simple_question,
@@ -772,22 +788,8 @@ class KContextEvolution(ComplexEvolution):
                 current_nodes = self.se._get_new_random_node()
                 return await self.aretry_evolve(current_tries, current_nodes)
 
-        # compress the question
-        compressed_question = await self._transform_question(
-            prompt=self.compress_question_prompt, question=question
-        )
-        logger.debug(
-            "[KContextEvolution] k_context question compressed: %s",
-            compressed_question,
-        )
 
-        assert self.evolution_filter is not None, "evolution filter cannot be None"
-        if await self.evolution_filter.filter(simple_question, compressed_question):
-            # retry
-            current_nodes = self.se._get_new_random_node()
-            return await self.aretry_evolve(current_tries, current_nodes)
-
-        return compressed_question, current_nodes, "k_context",simple_question,current_nodes
+        return question, k_content_nodes, "k_context", question,current_nodes
 
     def __hash__(self):
         return hash(self.__class__.__name__)

@@ -59,12 +59,12 @@ k_context = KContextEvolution(context_num=5)
 # 多来源
 multi_context = MultiContextEvolution(context_num=3)
 # 这里选择要生成什么类型的，以及比例
-distributions = {no_reference:0.1,simple: 0.1, negative_rejection:0.1,k_context:0.2,noise_robustness:0.1,multi_context:0.1, reasoning: 0.1, counterfactual:0.1,error_correction:0.1 } #{simple: 0.5, reasoning: 0.25, multi_context: 0.25, counterfactual:0.7,error_correction:0.2, no_reference:0.2, negative_rejection:0.2, noise_robustness,k_context,multi_context}
+distributions = {reasoning: 1}#{no_reference:0.1,simple: 0.1, negative_rejection:0.1,k_context:0.2,noise_robustness:0.1,multi_context:0.1, reasoning: 0.1, counterfactual:0.1,error_correction:0.1 } 
 
 generator = TestsetGenerator.with_openai(chunk_size=1000)
 testset = generator.generate_with_langchain_docs(
     documents[:50],
-    test_size=100,
+    test_size=10,
     raise_exceptions=False,
     with_debugging_logs=False,
     distributions=distributions,
@@ -72,7 +72,7 @@ testset = generator.generate_with_langchain_docs(
 
 
 test_res_df = testset.to_pandas()
-print('test_res_df',test_res_df)
+# print('test_res_df',test_res_df)
 import datetime
 
 # 获取当前时间

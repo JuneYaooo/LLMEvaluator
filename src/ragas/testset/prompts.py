@@ -27,12 +27,12 @@ reasoning_question_prompt = Prompt(
     input_keys=["question", "context"],
     output_key="output",
     output_type="str",
-    language="english",
+    language="chinese",
 )
 
 error_correction_prompt = Prompt(
     name="error_correction_question",
-    instruction="""Turn the original question into one with some handwritten mistakes, like typos or slightly altered words, maintaining overall comprehension. Remember:
+    instruction="""Turn the original question into one with some handwritten mistakes, like typos or slightly altered words, including Chinese questions. maintaining overall comprehension. Remember:
     Rules to follow when rewriting question:
     1. phrases like 'based on the provided context','according to the context',etc are not allowed to appear in the question.""",
     examples=[
@@ -48,7 +48,7 @@ error_correction_prompt = Prompt(
     input_keys=["question"],
     output_key="output",
     output_type="str",
-    language="english",
+    language="chinese",
 )
 
 counterfactual_prompt = Prompt(
@@ -175,7 +175,7 @@ compress_question_prompt = Prompt(
     input_keys=["question"],
     output_key="output",
     output_type="str",
-    language="english",
+    language="chinese",
 )
 
 
@@ -273,7 +273,7 @@ keyphrase_extraction_prompt = Prompt(
 
 seed_question_prompt = Prompt(
     name="seed_question",
-    instruction="Generate a question that can be fully answered from given context. The question should be formed using topic",
+    instruction="Generate a question that can be fully answered from given context. The question should be formed using topic. Generate Chinese question",
     examples=[
         {
             "context": "Photosynthesis in plants involves converting light energy into chemical energy, using chlorophyll and other pigments to absorb light. This process is crucial for plant growth and the production of oxygen.",
@@ -377,7 +377,7 @@ question_rewrite_prompt = Prompt(
     input_keys=["context", "question", "feedback"],
     output_key="output",
     output_type="str",
-    language="english",
+    language="chinese",
 )
 
 ### Filters

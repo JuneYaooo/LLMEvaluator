@@ -179,7 +179,6 @@ def split_markdown(text):
 def split_markdown_by_headings(markdown_text):
     # 使用正则表达式按照标题拆分Markdown文本
     headings = re.split(r'\n\s*#', markdown_text.strip())
-    print('headings',headings)
 
     # 在每个标题前添加#（除了第一个标题）
     paragraphs = ['#' + heading if i > 0 else heading for i, heading in enumerate(headings)]
@@ -190,18 +189,14 @@ def split_markdown_by_headings(markdown_text):
     for paragraph in paragraphs:
         if paragraph=='' or paragraph is None:
             continue
-        # print('paragraph',paragraph)
         
         # 使用正则表达式匹配标题级别和内容
         match = re.match(r'(#*)(.*)', paragraph)
         title_level = len(match.group(1))
-        print('title_level',title_level)
         title_content = match.group(2).strip()
-        print('title_content',title_content)
         current_title_level1 = title_content if title_level == 1 else current_title_level1 if title_level > 1 and current_title_level1 else None
         current_title_level2 = None if title_level < 2 else title_content if title_level == 2 else current_title_level2 if title_level > 2 and current_title_level2 else None
         current_title_level3 = None if title_level < 3 else title_content if title_level == 3 else current_title_level3 if title_level > 3 and current_title_level3 else None
-        # print('match``',match)
         for section in paragraph.split('\n'):
             if section=='' or section is None:
                 continue
@@ -230,7 +225,6 @@ def split_docs_by_headings(text):
         if section=='' or section is None:
             continue
         if match_1:
-            # print('match_1',match_1)
             current_title_level1 = match_1.group(2)
             current_title_level2 = None
         elif match_2:
@@ -349,9 +343,7 @@ def read_docx(filepath):
 def process_docx(markdown_text, file_name):
     # 调用函数将Markdown拆分成段落
     paragraphs = split_docs_by_headings(markdown_text)
-    print('file_name',file_name)
     base_name, _ = os.path.splitext(file_name)
-    print('base_name',base_name)
     title = paragraphs[0]['content'] if len(paragraphs)>0 and 'content' in paragraphs[0] else base_name
     num_tokens = num_tokens_from_string(markdown_text, "cl100k_base")
 
