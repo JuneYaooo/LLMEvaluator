@@ -1,9 +1,13 @@
 from src.ragas.common.read_files import read_file, process_markdown, list_files_in_folder, unzip_file, extract_pdf, read_docx, process_docx, process_and_deduplicate,read_txt
 import os
+import dotenv
 from langchain_core.documents import Document
 
 from src.ragas.testset.generator import TestsetGenerator
-from src.ragas.testset.evolutions import simple, reasoning, multi_context, counterfactual, error_correction, no_reference, negative_rejection, noise_robustness
+from src.ragas.testset.evolutions import simple, reasoning, multi_context, counterfactual, error_correction, no_reference, negative_rejection, noise_robustness,MultiContextEvolution,KContextEvolution
+
+
+dotenv.load_dotenv(f'.env', override=True)
 
 print('os.getenv("LLM_API_BASE")',os.getenv("LLM_API_BASE"))
 os.environ['OPENAI_API_BASE'] = os.getenv("LLM_API_BASE")
@@ -51,14 +55,16 @@ for root, dirs, files in os.walk(folder_path):
             document = Document(page_content=file_info['file_content'], metadata={"filename": file_info["file_name"]}) #这里必须要filename，后面document里是根据这个名字来获取的
             documents.append(document)
 
-
+k_context = KContextEvolution(context_num=5)
+# 多来源
+multi_context = MultiContextEvolution(context_num=3)
 # 这里选择要生成什么类型的，以及比例
-distributions = {noise_robustness:1} #{simple: 0.5, reasoning: 0.25, multi_context: 0.25, counterfactual:0.7,error_correction:0.2, no_reference:0.2, negative_rejection:0.2, noise_robustness}
+distributions = {no_reference:0.1,simple: 0.1, negative_rejection:0.1,k_context:0.2,noise_robustness:0.1,multi_context:0.1, reasoning: 0.1, counterfactual:0.1,error_correction:0.1 } #{simple: 0.5, reasoning: 0.25, multi_context: 0.25, counterfactual:0.7,error_correction:0.2, no_reference:0.2, negative_rejection:0.2, noise_robustness,k_context,multi_context}
 
-generator = TestsetGenerator.with_openai(chunk_size=2000)
+generator = TestsetGenerator.with_openai(chunk_size=1000)
 testset = generator.generate_with_langchain_docs(
     documents[:50],
-    test_size=10,
+    test_size=100,
     raise_exceptions=False,
     with_debugging_logs=False,
     distributions=distributions,

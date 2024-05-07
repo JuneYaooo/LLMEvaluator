@@ -745,7 +745,6 @@ class KContextEvolution(ComplexEvolution):
             for node in random_nodes:
                 if node not in random_nodes and node.filename not in nodes_filename:
                     random_nodes.append(node)
-                    current_nodes.nodes.append(node)
                     nodes_filename.add(node.filename)
 
         prompt = self.k_context_question_prompt.format(
