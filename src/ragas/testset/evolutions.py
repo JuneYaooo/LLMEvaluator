@@ -505,10 +505,7 @@ class MultiContextEvolution(ComplexEvolution):
 
         if not similar_nodes:
             # retry
-            new_random_nodes = self.docstore.get_random_nodes(k=1)
-            current_nodes = CurrentNodes(
-                root_node=new_random_nodes[0], nodes=new_random_nodes
-            )
+            current_nodes = self.se._get_new_random_node()
             return await self.aretry_evolve(current_tries, current_nodes)
         else:
             assert isinstance(similar_nodes[0], Node), "similar_node must be a Node"

@@ -97,9 +97,6 @@ def generate_qa():
         run_config=RunConfig(max_workers=1)
     )
 
-    for d in testset.test_data:
-        print(len(d.contexts), d.metadata)
-
     test_res_df = testset.to_pandas()
 
     current_time = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
