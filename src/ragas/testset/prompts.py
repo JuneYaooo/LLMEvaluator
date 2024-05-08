@@ -32,7 +32,7 @@ reasoning_question_prompt = Prompt(
 
 error_correction_prompt = Prompt(
     name="error_correction_question",
-    instruction="""Turn the original question into one with some handwritten mistakes, like typos or slightly altered words, including Chinese questions. maintaining overall comprehension. Remember:
+    instruction="""Turn the original question into one with some handwritten mistakes, like typos or slightly altered words or colloquial, irregular description. The goal is to create a question that is likely to generate a more accurate answer. The question should be as close to the original as possible, but with some deliberate errors. The question should be in the same language as the original question. The question should be as close to the original as possible, but with some deliberate errors. The question should be in the same language as the original question. The question should be as close to the original as possible, but with some deliberate errors. The question should be in the same language as the original question. The question should be as close to the original as possible, but with some deliberate errors. The question should be in the same language as the original question. The question should be as close to the original as possible, but with some deliberate errors. The question should be in thesame language as the original question. The question should be as close to the original including Chinese questions. maintaining overall comprehension. Remember:
     Rules to follow when rewriting question:
     1. phrases like 'based on the provided context','according to the context',etc are not allowed to appear in the question.""",
     examples=[

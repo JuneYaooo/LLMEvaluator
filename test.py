@@ -35,7 +35,7 @@ def get_file_info(file_path):
     return file_info
 
 # 要遍历的文件夹路径
-folder_path = '/home/ubuntu/github/ragas/data' #/home/ubuntu/github/LLMEvaluator/data
+folder_path = '/home/ubuntu/github/LLMEvaluator/data/test_data_pdf'#'/home/ubuntu/github/ragas/data' #/home/ubuntu/github/LLMEvaluator/data
 
 # 存储所有文档的列表
 documents = []
@@ -53,12 +53,12 @@ k_context = KContextEvolution(context_num=5)
 # 多来源
 multi_context = MultiContextEvolution(context_num=3)
 # 这里选择要生成什么类型的，以及比例
-distributions = {multi_context:0.3,reasoning: 0.4,k_context:0.3}#{no_reference:0.1,simple: 0.1, negative_rejection:0.1,k_context:0.2,noise_robustness:0.1,multi_context:0.1, reasoning: 0.1, counterfactual:0.1,error_correction:0.1 } 
+distributions = {k_context:1}#{multi_context:0.3,error_correction:0.2, reasoning: 0.2,k_context:0.3}#{no_reference:0.1,simple: 0.1, negative_rejection:0.1,k_context:0.2,noise_robustness:0.1,multi_context:0.1, reasoning: 0.1, counterfactual:0.1,error_correction:0.1 } 
 
 generator = TestsetGenerator.with_openai(chunk_size=1000)
 testset = generator.generate_with_langchain_docs(
     documents[:50],
-    test_size=50,
+    test_size=2,
     raise_exceptions=False,
     with_debugging_logs=False,
     distributions=distributions,
