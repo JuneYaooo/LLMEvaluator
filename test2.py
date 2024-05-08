@@ -94,7 +94,7 @@ def generate_qa():
         raise_exceptions=False,
         with_debugging_logs=False,
         distributions=distributions,
-        run_config=RunConfig(max_workers=1)
+        run_config=RunConfig(max_workers=int(os.getenv('MAX_WORKER')))
     )
 
     test_res_df = testset.to_pandas()
@@ -183,7 +183,7 @@ def evaluate_qa():
         ],
         llm=llm,
         embeddings=embeddings,
-        run_config=RunConfig(max_workers=4)
+        run_config=RunConfig(max_workers=int(os.getenv('MAX_WORKER')))
     )
     df = result.to_pandas()
     # print(df.head())

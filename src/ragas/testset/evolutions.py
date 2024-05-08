@@ -501,7 +501,7 @@ class MultiContextEvolution(ComplexEvolution):
         # find a similar node and generate a question based on both
         merged_node = self.merge_nodes(current_nodes)
         similar_nodes = self.docstore.get_similar(merged_node, top_k=self.context_num, threshold=self.threshold)
-        multi_nodes = CurrentNodes(root_node=current_nodes.nodes[0], nodes=[current_nodes.nodes[0]])
+        multi_nodes = CurrentNodes(root_node=current_nodes.root_node, nodes=current_nodes.nodes)
 
         if not similar_nodes:
             # retry
@@ -753,11 +753,10 @@ class KContextEvolution(ComplexEvolution):
 
         random_nodes = []
         nodes_filename = set([current_nodes.nodes[0].filename])
-        k_content_nodes = CurrentNodes(root_node=current_nodes.nodes[0], nodes=[current_nodes.nodes[0]])
-        try_num = 0
-        while len(random_nodes) != self.context_num and try_num<5:
+        k_content_nodes = CurrentNodes(root_node=current_nodes.root_node, nodes=current_nodes.nodes)
+        for _ in range(max(self.context_num, 5)):
+            if len(random_nodes) >= self.context_num: break
             n = self.context_num - len(random_nodes)
-            try_num+=1
             for node in self.docstore.get_random_nodes(n):
                 if node.filename not in nodes_filename:
                     random_nodes.append(node)
