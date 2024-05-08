@@ -286,14 +286,14 @@ def process_markdown(markdown_text, file_name):
                 'serial_number':idx
             }
             result_list.append(result_dict)
-    # 添加文件名，所有段落
-    result_dict = {
-        'text': file_name,
-        '段落': paragraph['content'],
-        '文件名': file_name,
-        '论文名':title,
-        'num_tokens':num_tokens
-    }
+    # # 添加文件名，所有段落
+    # result_dict = {
+    #     'text': file_name,
+    #     '段落': paragraph['content'],
+    #     '文件名': file_name,
+    #     '论文名':title,
+    #     'num_tokens':num_tokens
+    # }
     result_list.append(result_dict)
 
     return result_list
@@ -383,14 +383,14 @@ def process_docx(markdown_text, file_name):
             }
             result_list.append(result_dict)
     # 添加文件名，所有段落
-    result_dict = {
-        'text': file_name,
-        '段落': paragraph['content'],
-        '文件名': file_name,
-        '论文名':title,
-        'num_tokens':num_tokens
-    }
-    result_list.append(result_dict)
+    # result_dict = {
+    #     'text': file_name,
+    #     '段落': paragraph['content'],
+    #     '文件名': file_name,
+    #     '论文名':title,
+    #     'num_tokens':num_tokens
+    # }
+    # result_list.append(result_dict)
 
     return result_list
 

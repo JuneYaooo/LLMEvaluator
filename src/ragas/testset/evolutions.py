@@ -55,6 +55,7 @@ class DataRow(BaseModel):
     ground_truth: t.Union[str, float] = np.nan
     evolution_type: str
     metadata: t.List[dict]
+    metadata_raw: t.List[dict]
 
 
 @dataclass
@@ -258,7 +259,7 @@ class Evolution:
         #     metadata=[n.metadata for n in relevant_context.nodes],
         # )
         # Check if verdict exists and equals 1, otherwise raise an error
-        if answer.get("verdict") == "1":
+        if answer.get("verdict") == "1" and answer.get("answer", np.nan) not in (np.nan,"1"):
             return DataRow(
                 question=question.strip('"'),
                 question_raw=question_raw.strip('"'),
@@ -266,7 +267,8 @@ class Evolution:
                 contexts_raw=[n.page_content for n in relevant_context.nodes],
                 ground_truth=answer.get("answer", np.nan),
                 evolution_type=evolution_type,
-                metadata=[n.metadata for n in relevant_context.nodes],
+                metadata=[n.metadata for n in current_nodes.nodes],
+                metadata_raw=[n.metadata for n in relevant_context.nodes],
             )
         else:
             raise ValueError("Answer verdict is not 1 or does not exist")
