@@ -7,6 +7,9 @@ import dotenv
 import datasets
 import datetime
 import pandas as pd
+from rich import pretty
+from rich import inspect
+from rich import print as rp
 from langchain_core.documents import Document
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from ragas.run_config import RunConfig
@@ -29,6 +32,7 @@ from src.ragas.testset.evolutions import (
     KContextEvolution
 )
 
+pretty.install()
 env_state = os.getenv('ENV_STATE', 'example')
 dotenv.load_dotenv(f'.env.{env_state}', override=True)
 
@@ -71,8 +75,8 @@ def load_documents():
 
 def generate_qa():
     documents = load_documents()
-    k_context = KContextEvolution(context_num=2)
-    multi_context = MultiContextEvolution(context_num=2)
+    k_context = KContextEvolution(context_num=3)
+    multi_context = MultiContextEvolution(context_num=3)
     distributions = {multi_context: 1} #{simple: 0.5, reasoning: 0.25, multi_context: 0.25, counterfactual:0.7,error_correction}
 
     generator_llm = ChatOpenAI(model="gpt-3.5-turbo-16k")
@@ -93,9 +97,11 @@ def generate_qa():
         run_config=RunConfig(max_workers=1)
     )
 
+    for d in testset.test_data:
+        print(len(d.contexts), d.metadata)
 
     test_res_df = testset.to_pandas()
-    
+
     current_time = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     if not os.path.exists('output'):
         os.makedirs('output')
@@ -188,6 +194,6 @@ def evaluate_qa():
     current_time = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     df.to_csv(f"data/eval_{current_time}.csv", index=False, encoding='utf-8')
 
-# generate_qa()
+generate_qa()
 # answer_qa()
-evaluate_qa()
+# evaluate_qa()

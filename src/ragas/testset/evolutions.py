@@ -482,6 +482,7 @@ class MultiContextEvolution(ComplexEvolution):
         default_factory=lambda: multi_context_question_prompt
     )
     context_num: int = 1
+    threshold: float = 0.7
 
     async def _aevolve(
         self, current_tries: int, current_nodes: CurrentNodes
@@ -499,12 +500,12 @@ class MultiContextEvolution(ComplexEvolution):
         )
         # find a similar node and generate a question based on both
         merged_node = self.merge_nodes(current_nodes)
-        similar_nodes = self.docstore.get_similar(merged_node, top_k=self.context_num)
+        similar_nodes = self.docstore.get_similar(merged_node, top_k=self.context_num, threshold=self.threshold)
         multi_nodes = copy.deepcopy(current_nodes)
 
         if not similar_nodes:
             # retry
-            new_random_nodes = self.docstore.get_random_nodes(k=self.context_num)
+            new_random_nodes = self.docstore.get_random_nodes(k=1)
             current_nodes = CurrentNodes(
                 root_node=new_random_nodes[0], nodes=new_random_nodes
             )
@@ -556,7 +557,7 @@ class MultiContextEvolution(ComplexEvolution):
             current_nodes = self.se._get_new_random_node()
             return await self.aretry_evolve(current_tries, current_nodes)
 
-        return compressed_question, multi_nodes, "multi_context",compressed_question,multi_nodes
+        return compressed_question, multi_nodes, "multi_context", compressed_question, multi_nodes
 
     def __hash__(self):
         return hash(self.__class__.__name__)
@@ -758,9 +759,8 @@ class KContextEvolution(ComplexEvolution):
         k_content_nodes = copy.deepcopy(current_nodes)
         while len(random_nodes) != self.context_num:
             n = self.context_num - len(random_nodes)
-            random_nodes = self.docstore.get_random_nodes(n)
-            for node in random_nodes:
-                if node not in random_nodes and node.filename not in nodes_filename:
+            for node in self.docstore.get_random_nodes(n):
+                if node.filename not in nodes_filename:
                     random_nodes.append(node)
                     nodes_filename.add(node.filename)
                     k_content_nodes.nodes.append(node)
@@ -790,8 +790,7 @@ class KContextEvolution(ComplexEvolution):
                 current_nodes = self.se._get_new_random_node()
                 return await self.aretry_evolve(current_tries, current_nodes)
 
-
-        return question, k_content_nodes, "k_context", question,current_nodes
+        return question, k_content_nodes, "k_context", question, current_nodes
 
     def __hash__(self):
         return hash(self.__class__.__name__)
