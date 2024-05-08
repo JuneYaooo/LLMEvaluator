@@ -14,6 +14,7 @@ from ragas import evaluate
 from ragas.metrics import (
     answer_relevancy,
     faithfulness,
+    answer_similarity
 )
 from ragas.testset.prompts import question_answer_prompt
 
@@ -174,7 +175,8 @@ def evaluate_qa():
         eval_qa["eval"],
         metrics=[
             faithfulness,
-            answer_relevancy
+            answer_relevancy,
+            answer_similarity
         ],
         llm=llm,
         embeddings=embeddings,
