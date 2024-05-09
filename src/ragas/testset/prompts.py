@@ -7,12 +7,13 @@ reasoning_question_prompt = Prompt(
     name="reasoning_question",
     instruction="""Complicate the given question by rewriting question into a multi-hop reasoning question based on the provided context.
     Answering the question should require the reader to make multiple logical connections or inferences using the information available in given context.
+    The question should be in the same language as the original question.
     Rules to follow when rewriting question:
     1. Ensure that the rewritten question can be answered entirely from the information present in the contexts.
     2. Do not frame questions that contains more than 15 words. Use abbreviation wherever possible.
     3. Make sure the question is clear and unambiguous.
     4. phrases like 'based on the provided context','according to the context',etc are not allowed to appear in the question.
-    5. The question should be in the same language as the original question. """,
+    5. The question should be in the same language as the original question. for example return Chinese question if my original question is in Chinese""",
     examples=[
         {
             "question": "What is the capital of France?",
