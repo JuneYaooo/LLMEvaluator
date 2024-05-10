@@ -579,11 +579,61 @@ class ReasoningEvolution(ComplexEvolution):
     async def _aevolve(
         self, current_tries: int, current_nodes: CurrentNodes
     ) -> EvolutionOutput:
-        current_nodes = self.docstore.get_max_context(current_nodes.nodes[0], os.getenv("CHUNK_MAX_LENGTH"))
-        result = await self._acomplex_evolution(
-            current_tries, current_nodes, self.reasoning_question_prompt
+        assert self.generator_llm is not None, "generator_llm cannot be None"
+        assert self.question_filter is not None, "question_filter cannot be None"
+        assert self.se is not None, "simple evolution cannot be None"
+
+        # current_nodes = self.docstore.get_max_context(current_nodes.nodes[0], os.getenv("CHUNK_MAX_LENGTH"))
+        simple_question, current_nodes, _, ax, bx = await self.se._aevolve(
+            current_tries, current_nodes
         )
-        return result[0], result[1], "reasoning", result[2], result[3]
+        logger.debug(
+            "[%s] simple question generated: %s",
+            self.__class__.__name__,
+            simple_question,
+        )
+
+        merged_node = self.merge_nodes(current_nodes)
+        result = await self.generator_llm.generate(
+            prompt=reasoning_question_prompt.format(
+                question=simple_question, context=merged_node.page_content
+            )
+        )
+        reasoning_question = result.generations[0][0].text.strip()
+        is_valid_question, feedback = await self.question_filter.filter(
+            reasoning_question
+        )
+        if not is_valid_question:
+            # retry
+            reasoning_question, current_nodes = await self.fix_invalid_question(
+                reasoning_question, current_nodes, feedback
+            )
+            logger.info("rewritten question: %s", reasoning_question)
+            is_valid_question, _ = await self.question_filter.filter(reasoning_question)
+            if not is_valid_question:
+                # retry with new nodes added
+                current_nodes = self.se._get_new_random_node()
+                return await self.aretry_evolve(current_tries, current_nodes)
+
+        # compress the question
+        compressed_question = await self._transform_question(
+            prompt=self.compress_question_prompt, question=reasoning_question
+        )
+        logger.debug(
+            "[%s] question compressed: %s",
+            self.__class__.__name__,
+            reasoning_question,
+        )
+
+        assert self.evolution_filter is not None, "evolution filter cannot be None"
+        if await self.evolution_filter.filter(simple_question, compressed_question):
+            # retry
+            current_nodes = self.se._get_new_random_node()
+            logger.debug(
+                "evolution_filter failed, retrying with %s", len(current_nodes.nodes)
+            )
+            return await self.aretry_evolve(current_tries, current_nodes)
+        return compressed_question, current_nodes,  "reasoning", simple_question, current_nodes
 
     def __hash__(self):
         return hash(self.__class__.__name__)
@@ -704,7 +754,7 @@ class ErrorCorrectionEvolution(ComplexEvolution):
             simple_question,
         )
 
-        merged_node = self.merge_nodes(current_nodes)
+        # merged_node = self.merge_nodes(current_nodes)
         result = await self.generator_llm.generate(
             prompt=error_correction_prompt.format(
                 question=simple_question,
@@ -924,7 +974,7 @@ class NoiseRobustnessEvolution(ComplexEvolution):
         )
         negative_rejection_question = result.generations[0][0].text.strip()
         search_negative_list = await self.docstore.search_doc(negative_rejection_question, top_k=5)
-        search_nodes = copy.deepcopy(current_nodes)
+        search_nodes = CurrentNodes(root_node=current_nodes.root_node, nodes=current_nodes.nodes)
         for node in search_negative_list:
             search_nodes.nodes.append(node)
         # 打乱顺序

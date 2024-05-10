@@ -7,11 +7,13 @@ reasoning_question_prompt = Prompt(
     name="reasoning_question",
     instruction="""Complicate the given question by rewriting question into a multi-hop reasoning question based on the provided context.
     Answering the question should require the reader to make multiple logical connections or inferences using the information available in given context.
+    The question should be in the same language as the original question.
     Rules to follow when rewriting question:
     1. Ensure that the rewritten question can be answered entirely from the information present in the contexts.
     2. Do not frame questions that contains more than 15 words. Use abbreviation wherever possible.
     3. Make sure the question is clear and unambiguous.
-    4. phrases like 'based on the provided context','according to the context',etc are not allowed to appear in the question.""",
+    4. phrases like 'based on the provided context','according to the context',etc are not allowed to appear in the question.
+    5. The question should be in the same language as the original question. for example return Chinese question if my original question is in Chinese""",
     examples=[
         {
             "question": "What is the capital of France?",
@@ -32,9 +34,10 @@ reasoning_question_prompt = Prompt(
 
 error_correction_prompt = Prompt(
     name="error_correction_question",
-    instruction="""Turn the original question into one with some handwritten mistakes, like typos or slightly altered words or colloquial, irregular description. The goal is to create a question that is likely to generate a more accurate answer. The question should be as close to the original as possible, but with some deliberate errors. The question should be in the same language as the original question. The question should be as close to the original as possible, but with some deliberate errors. The question should be in the same language as the original question. The question should be as close to the original as possible, but with some deliberate errors. The question should be in the same language as the original question. The question should be as close to the original as possible, but with some deliberate errors. The question should be in the same language as the original question. The question should be as close to the original as possible, but with some deliberate errors. The question should be in thesame language as the original question. The question should be as close to the original including Chinese questions. maintaining overall comprehension. Remember:
+    instruction="""Turn the original question into one with some handwritten mistakes, like typos or slightly altered words or colloquial, irregular description. The question should be like the original, but with some deliberate errors. maintaining overall comprehension. Remember:
     Rules to follow when rewriting question:
-    1. phrases like 'based on the provided context','according to the context',etc are not allowed to appear in the question.""",
+    1. phrases like 'based on the provided context','according to the context',etc are not allowed to appear in the question.
+    2. The question should be in the same language as the original question. """,
     examples=[
         {
             "question": "How can we effectively reduce plastic pollution?",
@@ -56,7 +59,8 @@ counterfactual_prompt = Prompt(
     instruction="""Based on the question and context provided, replace the content of the context with counterfactual information, so that the content answering the original question is replaced by the counterfactual content, taking care to return only the content of the context.
     Rules to follow when rewriting context:
     1. Do not modify other content except the part that needs to be modified as counterfactual.
-    2. phrases like 'based on the provided context','according to the context',etc are not allowed to appear in the question.""",
+    2. phrases like 'based on the provided context','according to the context',etc are not allowed to appear in the question.
+    3. The question should be in the same language as the original question. """,
     examples=[
         {
             "question": "水的化学式是什么?",
@@ -161,7 +165,7 @@ conditional_question_prompt = Prompt(
 compress_question_prompt = Prompt(
     name="compress_question",
     instruction="""Rewrite the following question to make it more indirect and shorter while retaining the essence of the original question.
-    The goal is to create a question that conveys the same meaning but in a less direct manner. The rewritten question should shorter so use abbreviation wherever possible.""",
+    The goal is to create a question that conveys the same meaning but in a less direct manner. The rewritten question should shorter so use abbreviation wherever possible.The question should be in the same language as the original question. """,
     examples=[
         {
             "question": "What is the distance between the Earth and the Moon?",
@@ -205,7 +209,7 @@ conversational_question_prompt = Prompt(
 
 question_answer_prompt = Prompt(
     name="answer_formulate",
-    instruction="""Answer the question using the information from the given context. Output verdict as '1' if answer is present '-1' if answer is not present in the context.""",
+    instruction="""Answer the question using the information from the given context. Output verdict as '1' if answer is present '-1' if answer is not present in the context.The answer should be in the same language as the original question. """,
     examples=[
         {
             "context": """Climate change is significantly influenced by human activities, notably the emission of greenhouse gases from burning fossil fuels. The increased greenhouse gas concentration in the atmosphere traps more heat, leading to global warming and changes in weather patterns.""",
@@ -359,7 +363,7 @@ find_relevant_context_prompt = Prompt(
 
 question_rewrite_prompt = Prompt(
     name="rewrite_question",
-    instruction="""Given a context, question and feedback, rewrite the question to improve its clarity and answerability based on the feedback provided.""",
+    instruction="""Given a context, question and feedback, rewrite the question to improve its clarity and answerability based on the feedback provided. The question should be in the same language as the original question. """,
     examples=[
         {
             "context": "The Eiffel Tower was constructed using iron and was originally intended as a temporary exhibit for the 1889 World's Fair held in Paris. Despite its initial temporary purpose, the Eiffel Tower quickly became a symbol of Parisian ingenuity and an iconic landmark of the city, attracting millions of visitors each year. The tower's design, created by Gustave Eiffel, was initially met with criticism from some French artists and intellectuals, but it has since been celebrated as a masterpiece of structural engineering and architectural design.",
