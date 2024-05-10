@@ -10,6 +10,7 @@ import pandas as pd
 from rich import pretty
 from rich import inspect
 from rich import print as rp
+from pathlib import Path
 from langchain_core.documents import Document
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from ragas.run_config import RunConfig
@@ -109,10 +110,11 @@ def answer_qa(i=0):
     sys.path.append('/mnt/workspace/maokangkun/Model_Eval/LLaMA-Factory')
     from src.llmtuner import ChatModel
 
-    test_qa = pd.read_excel('data/llm_paper_eval_dataset.xlsx', sheet_name=1)
+    test_qa_file = sorted(Path('data/llm_questions').glob('*.xlsx'))[-1]
+    test_qa = pd.read_excel(test_qa_file, sheet_name=1)
     print(len(test_qa))
 
-    model_list = ['Meta-Llama-3-8B-Instruct']
+    model_list = ['Meta-Llama-3-8B-Instruct', 'pulse_v12_7b_gpt4_hf']
     model_name = model_list[i]
     model_path = f'/mnt/workspace/maokangkun/Model_Eval/models/{model_name}'
     device = f'cuda:{i}'
@@ -160,37 +162,61 @@ def answer_qa(i=0):
             'answer': ans,
             'contexts': contexts,
             'ground_truth': d.ground_truth,
-            'metadata': eval(d.metadata),
+            'metadata': [i for i in eval(d.metadata) if i],
             'evolution_type': d.evolution_type,
         })
 
-    out_file = f'data/answer_{model_name}.json'
+    out_file = f'data/llm_answers/{test_qa_file.stem}_{model_name}_answer.json'
     with open(out_file, 'w', encoding='utf-8') as f:
         json.dump(data, f, indent=4, ensure_ascii=False)
 
 def evaluate_qa():
-    eval_qa = datasets.load_dataset("json", data_files={'eval':"data/answer_Meta-Llama-3-8B-Instruct.json"})
+    # model_name = "gpt-3.5-turbo-16k"
+    model_name = "Qwen1.5-7B-Chat"
 
-    llm = ChatOpenAI(model="gpt-3.5-turbo-16k")
-    embeddings = OpenAIEmbeddings()
+    answer_dir = Path('data/llm_answers')
+    eval_dir = Path('data/llm_evals')
+    qa_id = sorted(Path('data/llm_questions').glob('*.xlsx'))[-1].stem
+    tobe_eval = []
+    for ans_file in answer_dir.glob(f'{qa_id}_*.json'):
+        eval_file = eval_dir / (ans_file.stem.replace('_answer', '') + f'_by_{model_name}.csv')
+        if not eval_file.exists():
+            tobe_eval.append([ans_file, eval_file])
 
-    result = evaluate(
-        eval_qa["eval"],
-        metrics=[
-            faithfulness,
-            answer_relevancy,
-            answer_similarity
-        ],
-        llm=llm,
-        embeddings=embeddings,
-        run_config=RunConfig(max_workers=int(os.getenv('MAX_WORKER')))
-    )
-    df = result.to_pandas()
-    # print(df.head())
+    print(tobe_eval)
 
-    current_time = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    df.to_csv(f"data/eval_{current_time}.csv", index=False, encoding='utf-8')
+    for inp_file, out_file in tobe_eval:
+        print(inp_file)
+        eval_qa = datasets.load_dataset("json", data_files={'eval':str(inp_file)})
 
-generate_qa()
+        llm = ChatOpenAI(model=model_name)
+        embeddings = OpenAIEmbeddings()
+
+        result = evaluate(
+            eval_qa["eval"],
+            metrics=[
+                faithfulness,
+                answer_relevancy,
+                answer_similarity
+            ],
+            llm=llm,
+            embeddings=embeddings,
+            run_config=RunConfig(max_workers=int(os.getenv('MAX_WORKER')))
+        )
+        df = result.to_pandas()
+        # print(df.head())
+        df.to_csv(out_file, index=False, encoding='utf-8')
+
+def check():
+    with open('data/llm_answers/q04_Meta-Llama-3-8B-Instruct_answer.json', 'r') as f:
+        data = json.load(f)
+    
+    for d in data:
+        m = d['metadata']
+        if m and type(m[0]) is str:
+            print(d['id'])
+
+# generate_qa()
 # answer_qa()
-# evaluate_qa()
+evaluate_qa()
+# check()
