@@ -109,16 +109,16 @@ def generate_qa():
 
 def answer_qa(i=0):
     import sys
-    sys.path.append('/mnt/workspace/maokangkun/Model_Eval/LLaMA-Factory')
+    sys.path.append('/ailab/user/maokangkun/Model_Eval/LLaMA-Factory')
     from src.llmtuner import ChatModel
 
     test_qa_file = sorted(Path('data/llm_questions').glob('*.xlsx'))[-1]
     test_qa = pd.read_excel(test_qa_file, sheet_name=1)
     print(len(test_qa))
 
-    model_list = ['Meta-Llama-3-8B-Instruct', 'pulse_v12_7b_gpt4_hf', 'Qwen1.5-7B-Chat']
+    model_list = ['Meta-Llama-3-8B-Instruct', 'Qwen1.5-7B-Chat', 'pulse_v12_7b_gpt4_hf']
     model_name = model_list[i]
-    model_path = f'/mnt/workspace/maokangkun/Model_Eval/models/{model_name}'
+    model_path = f'/ailab/user/maokangkun/models/hf/{model_name}'
     device = f'cuda:{i}'
     args = {
         'model_name_or_path': model_path,
@@ -175,7 +175,8 @@ def answer_qa(i=0):
 def evaluate_qa():
     # model_name = "gpt-3.5-turbo-16k"
     # model_name = "Qwen1.5-7B-Chat"
-    model_name = "Meta-Llama-3-8B-Instruct"
+    # model_name = "Meta-Llama-3-8B-Instruct"
+    model_name = "Meta-Llama-70B-Instruct"
 
     answer_dir = Path('data/llm_answers')
     eval_dir = Path('data/llm_evals')
@@ -185,8 +186,6 @@ def evaluate_qa():
         eval_file = eval_dir / (ans_file.stem.replace('_answer', '') + f'_by_{model_name}.csv')
         if not eval_file.exists() and model_name not in ans_file.name:
             tobe_eval.append([ans_file, eval_file])
-
-    print(tobe_eval)
 
     for inp_file, out_file in tobe_eval:
         print(inp_file)
@@ -204,7 +203,12 @@ def evaluate_qa():
             ],
             llm=llm,
             embeddings=embeddings,
-            run_config=RunConfig(max_workers=int(os.getenv('MAX_WORKER')))
+            run_config=RunConfig(
+                max_workers=int(os.getenv('MAX_WORKER')),
+                max_wait=1200,
+                timeout=1200
+            ),
+            raise_exceptions=False
         )
         df = result.to_pandas()
         # print(df.head())
@@ -245,7 +249,7 @@ def answer_qa_pulse():
     test_qa = pd.read_excel(test_qa_file, sheet_name=1)
     print(len(test_qa))
 
-    model_name = 'pulse_v12_7b_gpt4_hf'
+    model_name = '123bv11'
 
     data = []
     for _, d in tqdm.tqdm(list(test_qa.iterrows())):
@@ -263,7 +267,7 @@ def answer_qa_pulse():
 
         retry = 0
         while retry <= 5:
-            ret = get_pulse_reply(inp, '123bv11')
+            ret = get_pulse_reply(inp, model_name)
             m = re.findall(r'```{"answer": "(.*)", "verdict": ".*"}```', ret)
             if m:
                 ans = m[0]
@@ -281,7 +285,6 @@ def answer_qa_pulse():
             'metadata': [i for i in eval(d.metadata) if i],
             'evolution_type': d.evolution_type,
         })
-
     out_file = f'data/llm_answers/{test_qa_file.stem}_{model_name}_answer.json'
     with open(out_file, 'w', encoding='utf-8') as f:
         json.dump(data, f, indent=4, ensure_ascii=False)
@@ -292,7 +295,7 @@ def plot_result():
     sns.set_theme(style="whitegrid")
     eval_dir = Path('data/llm_evals')
 
-    qv = 'q04'
+    qv = sorted(Path('data/llm_questions').glob('*.xlsx'))[-1].stem
     data = pd.DataFrame([], columns=['question_id', 'model', 'evolution_type', 'metric', 'value'])
     for eval_file in eval_dir.glob(f'{qv}_*.csv'):
         df = pd.read_csv(eval_file)
@@ -327,7 +330,7 @@ def plot_result():
     plt.savefig(eval_dir / f'{qv}_items.png', dpi=300)
 
 # generate_qa()
-# answer_qa(2)
-# evaluate_qa()
+# answer_qa(1)
 # answer_qa_pulse()
+# evaluate_qa()
 plot_result()
